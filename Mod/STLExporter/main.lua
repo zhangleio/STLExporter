@@ -1,6 +1,6 @@
 ﻿--[[
 Title: bmax exporter
-Author(s): leio
+Author(s): leio, refactored LiXizhi
 Date: 2015/11/25
 Desc: 
 use the lib:
@@ -214,6 +214,7 @@ function STLExporter:init()
 	self.m_blockModels = {};
 
 	self:RegisterCommand();
+	self:RegisterExporter();
 end
 
 function STLExporter:OnLogin()
@@ -230,50 +231,83 @@ end
 function STLExporter:OnDestroy()
 end
 
+function STLExporter:RegisterExporter()
+	GameLogic.GetFilters():add_filter("GetExporters", function(exporters)
+		exporters[#exporters+1] = {id="STL", title="STL exporter", desc="export stl files for 3d printing"}
+		return exporters;
+	end);
+
+	GameLogic.GetFilters():add_filter("select_exporter", function(id)
+		if(id == "STL") then
+			id = nil; -- prevent other exporters
+			self:OnClickExport();
+		end
+		return id;
+	end);
+end
+
 function STLExporter:RegisterCommand()
 	local Commands = commonlib.gettable("MyCompany.Aries.Game.Commands");
 	Commands["stlexporter"] = {
 		name="stlexporter", 
-		quick_ref="/stlexporter", 
-		desc=[[export a bmax file to stl file
-/stlexporter input_file_name
-/stlexporter input_file_name true
+		quick_ref="/stlexporter [-b|binary] [-native|cpp] [filename]", 
+		desc=[[export a bmax file or current selection to stl file
+@param -b: export as binary STL file
+@param -native: use C++ exporter, instead of NPL.
+/stlexporter test.stl			export current selection to test.stl file
+/stlexporter -b test.bmax		convert test.bmax file to test.stl file
 ]], 
 		handler = function(cmd_name, cmd_text, cmd_params, fromEntity)
-			local input_file_name,cmd_text = CmdParser.ParseString(cmd_text);
-			local binary = CmdParser.ParseBool(cmd_text);
-			self:Export(input_file_name,nil,binary);
-		end,
-	};
-	local Commands = commonlib.gettable("MyCompany.Aries.Game.Commands");
-	Commands["stlexporternative"] = {
-		name="stlexporternative", 
-		quick_ref="/stlexporternative", 
-		desc=[[export a bmax file to stl file use c++ plugin
-/stlexporternative input_file_name
-/stlexporternative input_file_name true
-]], 
-		handler = function(cmd_name, cmd_text, cmd_params, fromEntity)
-			local input_file_name,cmd_text = CmdParser.ParseString(cmd_text);
-			local binary = CmdParser.ParseBool(cmd_text);
-			self:Export(input_file_name,nil,binary,true);
+			local file_name, options;
+			options, cmd_text = CmdParser.ParseOptions(cmd_text);
+			file_name,cmd_text = CmdParser.ParseString(cmd_text);
+
+			local save_as_binary = options.b~=nil or options.binary~=nil;
+			local use_cpp_native = options.native~=nil or options.cpp~=nil;
+			self:Export(file_name,nil, save_as_binary, use_cpp_native);
 		end,
 	};
 end
+
+function STLExporter:OnClickExport()
+	NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/SaveFileDialog.lua");
+	local SaveFileDialog = commonlib.gettable("MyCompany.Aries.Game.GUI.SaveFileDialog");
+	SaveFileDialog.ShowPage("please enter STL file name", function(result)
+		if(result and result~="") then
+			STLExporter.last_filename = result;
+			local filename = GameLogic.GetWorldDirectory()..result;
+			LOG.std(nil, "info", "STLExporter", "exporting to %s", filename);
+			GameLogic.RunCommand("stlexporter", filename);
+		end
+	end, STLExporter.last_filename, nil, "stl");
+end
+
+-- @param input_file_name: file name. if it is *.bmax, we will convert this file and save output to *.stl file.
+-- if it is not, we will convert current selection to *.stl files. 
+-- @param output_file_name: this should be nil, unless you explicitly specify an output name. 
+-- @param -binary: export as binary STL file
+-- @param -native: use C++ exporter, instead of NPL.
 function STLExporter:Export(input_file_name,output_file_name,binary,native)
-	if(not input_file_name)then return end
-	if(binary == nil)then
-		binary = false;
-	end
+	input_file_name = input_file_name or "default.stl";
+	binary = binary == true;
+
+	local name, extension = string.match(input_file_name,"(.+).(%w%w%w)$");
+
 	if(not output_file_name)then
-		local __,__,name = string.find(input_file_name,"(.+).bmax");
-		name = name or input_file_name;
-		output_file_name = name .. ".stl";
+		if(extension == "bmax") then
+			output_file_name = name .. ".stl";
+		elseif(extension == "stl") then
+			output_file_name = name .. ".stl";
+		else
+			output_file_name = input_file_name..".stl";
+		end
 	end
+	LOG.std(nil, "info", "STLExporter", "exporting from %s to %s", input_file_name, output_file_name);
 	self:Load(input_file_name);
+
 	if(native)then
 		if(ParaScene.BmaxExportToSTL)then
-			if(ParaScene.BmaxExportToSTL(input_file_name,output_file_name,binary))then
+			if(ParaScene.BmaxExportToSTL(input_file_name,output_file_name, binary))then
 				BroadcastHelper.PushLabel({id="stlexporter", label = format(L"STL文件成功保存到:%s", commonlib.Encoding.DefaultToUtf8(output_file_name)), max_duration=4000, color = "0 255 0", scaling=1.1, bold=true, shadow=true,});
 			end
 		end
