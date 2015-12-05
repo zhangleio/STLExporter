@@ -110,7 +110,7 @@ function STLExporter:Export(input_file_name,output_file_name,binary,native)
 	input_file_name = input_file_name or "default.stl";
 	binary = binary == true;
 
-	local name, extension = string.match(input_file_name,"(.+).(%w%w%w)$");
+	local name, extension = string.match(input_file_name,"(.+)%.(%w+)$");
 
 	if(not output_file_name)then
 		if(extension == "bmax") then
@@ -134,7 +134,11 @@ function STLExporter:Export(input_file_name,output_file_name,binary,native)
 		local STLWriter = commonlib.gettable("Mod.STLExporter.STLWriter");
 
 		local model = BMaxModel:new();
-		model:Load(input_file_name);
+		if(extension == "bmax") then
+			model:Load(input_file_name);
+		else
+			-- TODO: load from current selection
+		end
 		
 		local writer = STLWriter:new();
 		writer:LoadModel(model);
