@@ -98,7 +98,7 @@ function STLExporter:OnClickExport()
 			LOG.std(nil, "info", "STLExporter", "exporting to %s", filename);
 			GameLogic.RunCommand("stlexporter", filename);
 		end
-	end, STLExporter.last_filename, nil, "stl");
+	end, STLExporter.last_filename or "test", nil, "stl");
 end
 
 -- @param input_file_name: file name. if it is *.bmax, we will convert this file and save output to *.stl file.
@@ -137,10 +137,16 @@ function STLExporter:Export(input_file_name,output_file_name,binary,native)
 		if(extension == "bmax") then
 			model:Load(input_file_name);
 		else
-			-- TODO: load from current selection
+			-- load from current selection
+			local blocks = Game.SelectionManager:GetSelectedBlocks();
+			if(blocks) then
+				model:LoadFromBlocks(blocks);
+			end
 		end
 		
 		local writer = STLWriter:new();
+		-- STL file uses Z up
+		writer:SetYAxisUp(false);
 		writer:LoadModel(model);
 
 		if(binary)then
@@ -150,6 +156,10 @@ function STLExporter:Export(input_file_name,output_file_name,binary,native)
 		end
 	end
 	if(res)then
-		GameLogic.AddBBS("stlexporter", format(L"STL文件成功保存到:%s", commonlib.Encoding.DefaultToUtf8(output_file_name)));
+		_guihelper.MessageBox(format("Successfully saved STL file to :%s, do you want to open it?", commonlib.Encoding.DefaultToUtf8(output_file_name)), function(res)
+			if(res and res == _guihelper.DialogResult.Yes) then
+				ParaGlobal.ShellExecute("open", ParaIO.GetCurDirectory(0)..output_file_name, "", "", 1);
+			end
+		end, _guihelper.MessageBoxButtons.YesNo);
 	end
 end

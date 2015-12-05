@@ -37,6 +37,19 @@ function BMaxModel:ctor()
 	self.m_blockModels = {};
 end
 
+-- whether we will resize the model to self:GetMaxModelSize();
+function BMaxModel:EnableAutoScale(bEnable)
+	self.m_bAutoScale = bEnable;
+end
+
+function BMaxModel:GetMaxModelSize()
+	return self.m_maxSize;
+end
+
+function BMaxModel:SetMaxModelSize(size)
+	self.m_maxSize = size or 1;
+end
+
 -- public: load from file
 -- @param bmax_filename: load from *.bmax file
 function BMaxModel:Load(bmax_filename)
