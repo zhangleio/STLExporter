@@ -35,8 +35,15 @@ function BMaxModel:ctor()
 	self.m_fScale = 1;
 	self.m_nodes = {};
 	self.m_blockModels = {};
-end
+	self.unit_value = nil;
 
+end
+function BMaxModel:SetUnit(v)
+	self.unit_value = v;
+end
+function BMaxModel:IsAutoScale()
+	return (BMaxModel.m_bAutoScale or (self.unit_value and self.unit_value > 0)) 
+end
 -- whether we will resize the model to self:GetMaxModelSize();
 function BMaxModel:EnableAutoScale(bEnable)
 	self.m_bAutoScale = bEnable;
@@ -67,7 +74,7 @@ end
 function BMaxModel:LoadFromBlocks(blocks)
 	self:InitFromBlocks(blocks);
 	self:CalculateVisibleBlocks();
-	if(self.m_bAutoScale)then
+	if(self:IsAutoScale())then
 		self:ScaleModels();
 	end
 end
@@ -136,9 +143,13 @@ function BMaxModel:InitFromBlocks(blocks)
 		self:InsertNode(node);
 	end
 	--set scaling;
-	if (self.m_bAutoScale) then
-		local fMaxLength = math.max(math.max(height, width), depth) + 1;
-		self.m_fScale = self:CalculateScale(fMaxLength);
+	if (self:IsAutoScale()) then
+		if(self.unit_value)then
+			self.m_fScale = self.unit_value;
+		else
+			local fMaxLength = math.max(math.max(height, width), depth) + 1;
+			self.m_fScale = self:CalculateScale(fMaxLength);
+		end
 	end
 end
 

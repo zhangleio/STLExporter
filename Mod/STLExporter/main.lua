@@ -80,23 +80,24 @@ function STLExporter:RegisterCommand()
 			local file_name, options;
 			options, cmd_text = CmdParser.ParseOptions(cmd_text);
 			file_name,cmd_text = CmdParser.ParseString(cmd_text);
-
+			unit_value,cmd_text = CmdParser.ParseString(cmd_text);
+			unit_value = tonumber(unit_value)
 			local save_as_binary = options.b~=nil or options.binary~=nil;
 			local use_cpp_native = options.native~=nil or options.cpp~=nil;
-			self:Export(file_name,nil, save_as_binary, use_cpp_native);
+			self:Export(file_name,nil, save_as_binary, use_cpp_native,unit_value);
 		end,
 	};
 end
 
 function STLExporter:OnClickExport()
-	NPL.load("(gl)script/apps/Aries/Creator/Game/GUI/SaveFileDialog.lua");
-	local SaveFileDialog = commonlib.gettable("MyCompany.Aries.Game.GUI.SaveFileDialog");
-	SaveFileDialog.ShowPage("please enter STL file name", function(result)
-		if(result and result~="") then
-			STLExporter.last_filename = result;
-			local filename = GameLogic.GetWorldDirectory()..result;
+	NPL.load("(gl)Mod/STLExporter/SaveSTLDialog.lua");
+	local SaveSTLDialog = commonlib.gettable("Mod.STLExporter.SaveSTLDialog");
+	SaveSTLDialog.ShowPage("please enter STL file name", function(result)
+		if(result and result.filename and result.filename ~= "") then
+			STLExporter.last_filename = result.filename;
+			local filename = GameLogic.GetWorldDirectory()..result.filename;
 			LOG.std(nil, "info", "STLExporter", "exporting to %s", filename);
-			GameLogic.RunCommand("stlexporter", filename);
+			GameLogic.RunCommand("stlexporter", string.format("%s %f",filename,result.unit));
 		end
 	end, STLExporter.last_filename or "test", nil, "stl");
 end
@@ -106,7 +107,8 @@ end
 -- @param output_file_name: this should be nil, unless you explicitly specify an output name. 
 -- @param -binary: export as binary STL file
 -- @param -native: use C++ exporter, instead of NPL.
-function STLExporter:Export(input_file_name,output_file_name,binary,native)
+-- @param unit_value:1 block = unit_value(um,mm,cm,in,ft,m) only valid in NPL exporter now.
+function STLExporter:Export(input_file_name,output_file_name,binary,native,unit_value)
 	input_file_name = input_file_name or "default.stl";
 	binary = binary == true;
 
@@ -134,6 +136,7 @@ function STLExporter:Export(input_file_name,output_file_name,binary,native)
 		local STLWriter = commonlib.gettable("Mod.STLExporter.STLWriter");
 
 		local model = BMaxModel:new();
+		model:SetUnit(unit_value);
 		if(extension == "bmax") then
 			model:Load(input_file_name);
 		else
